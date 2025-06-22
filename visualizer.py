@@ -50,6 +50,15 @@ def choose_output_device() -> int | None:
 
 
 
+def device_channels(info: dict) -> int:
+    """Return the supported channel count for a device.
+
+    Prefers the input channel count when available, otherwise falls back
+    to the output channel count.
+    """
+    return int(info.get("maxInputChannels") or info.get("maxOutputChannels") or 1)
+
+
 def open_output_stream(
     *, samplerate: int, blocksize: int, device_index: int | None = None
 ) -> tuple[pyaudio.PyAudio, pyaudio.Stream, int]:
@@ -89,7 +98,7 @@ def open_output_stream(
                         device = dev
                         break
 
-            channels = max(int(device.get("maxInputChannels", 1)), 1)
+            channels = device_channels(device)
             stream = pa.open(
                 format=pyaudio.paFloat32,
                 channels=channels,
@@ -107,7 +116,7 @@ def open_output_stream(
             if device_index is not None
             else pa.get_default_input_device_info()
         )
-        channels = max(int(device.get("maxInputChannels", 1)), 1)
+        channels = device_channels(device)
         stream = pa.open(
             format=pyaudio.paFloat32,
             channels=channels,
