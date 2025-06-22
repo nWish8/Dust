@@ -14,20 +14,55 @@ import pyaudio
 import sys
 
 
+def choose_output_device() -> int | None:
+    """Prompt the user to select an output device.
+
+    Returns the PyAudio device index or ``None`` for the default device.
+    """
+    pa = pyaudio.PyAudio()
+    try:
+        devices: list[int] = []
+        print("Available output devices:")
+        for idx in range(pa.get_device_count()):
+            info = pa.get_device_info_by_index(idx)
+            if sys.platform == "win32":
+                if info.get("maxOutputChannels", 0) > 0 and not info.get("isLoopbackDevice", False):
+                    devices.append(idx)
+                    print(f"{len(devices) - 1}: {info.get('name')}")
+            else:
+                if info.get("maxInputChannels", 0) > 0:
+                    devices.append(idx)
+                    print(f"{len(devices) - 1}: {info.get('name')}")
+
+        if not devices:
+            return None
+
+        choice = input("Select device [0]: ").strip()
+        try:
+            selection = int(choice) if choice else 0
+        except ValueError:
+            selection = 0
+        if selection < 0 or selection >= len(devices):
+            selection = 0
+        return devices[selection]
+    finally:
+        pa.terminate()
+
+
 
 def open_output_stream(
-    *, samplerate: int, blocksize: int
+    *, samplerate: int, blocksize: int, device_index: int | None = None
 ) -> tuple[pyaudio.PyAudio, pyaudio.Stream, int]:
-    """Return a PyAudio stream capturing the default output device.
+    """Return a PyAudio stream capturing the chosen output device.
 
     On Windows this uses WASAPI loopback so whatever is playing through the
-    speakers will be captured. On other platforms the default input device is
-    used as a fallback.
+    selected speakers will be captured. On other platforms the chosen input
+    device is used as a fallback.
     """
     pa = pyaudio.PyAudio()
 
     if sys.platform == "win32":
-        # Attempt to locate the default speaker's loopback device.
+        # Locate the WASAPI host API for loopback capture
         wasapi_info = None
         for i in range(pa.get_host_api_count()):
             info = pa.get_host_api_info_by_index(i)
@@ -36,17 +71,24 @@ def open_output_stream(
                 break
 
         if wasapi_info is not None:
-            device = pa.get_device_info_by_index(wasapi_info["defaultOutputDevice"])
+            out_device = (
+                pa.get_device_info_by_index(wasapi_info["defaultOutputDevice"])
+                if device_index is None
+                else pa.get_device_info_by_index(device_index)
+            )
+
+            device = out_device
             if not device.get("isLoopbackDevice", False):
                 for i in range(pa.get_device_count()):
                     dev = pa.get_device_info_by_index(i)
                     if (
                         dev.get("hostApi") == wasapi_info["index"]
                         and dev.get("isLoopbackDevice")
-                        and dev.get("name") == device.get("name")
+                        and dev.get("name") == out_device.get("name")
                     ):
                         device = dev
                         break
+
             channels = max(int(device.get("maxInputChannels", 1)), 1)
             stream = pa.open(
                 format=pyaudio.paFloat32,
@@ -58,8 +100,12 @@ def open_output_stream(
             )
             return pa, stream, channels
 
-    # Fallback: capture from the default input device
-    device = pa.get_default_input_device_info()
+    # Fallback: capture from the default or selected input device
+    device = (
+        pa.get_device_info_by_index(device_index)
+        if device_index is not None
+        else pa.get_default_input_device_info()
+    )
     channels = max(int(device.get("maxInputChannels", 1)), 1)
     stream = pa.open(
         format=pyaudio.paFloat32,
@@ -67,6 +113,7 @@ def open_output_stream(
         rate=samplerate,
         input=True,
         frames_per_buffer=blocksize,
+        input_device_index=device["index"],
     )
     return pa, stream, channels
 
@@ -88,7 +135,12 @@ def compute_fft_bars(samples: np.ndarray, num_bars: int) -> np.ndarray:
 
 def run_visualizer(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: int = 60) -> None:
     """Run the visualization until the window is closed."""
-    pa, stream, channels = open_output_stream(samplerate=samplerate, blocksize=blocksize)
+    device_index = choose_output_device()
+    pa, stream, channels = open_output_stream(
+        samplerate=samplerate,
+        blocksize=blocksize,
+        device_index=device_index,
+    )
 
     pygame.init()
     width, height = 800, 400
