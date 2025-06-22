@@ -101,21 +101,25 @@ def open_output_stream(
             return pa, stream, channels
 
     # Fallback: capture from the default or selected input device
-    device = (
-        pa.get_device_info_by_index(device_index)
-        if device_index is not None
-        else pa.get_default_input_device_info()
-    )
-    channels = max(int(device.get("maxInputChannels", 1)), 1)
-    stream = pa.open(
-        format=pyaudio.paFloat32,
-        channels=channels,
-        rate=samplerate,
-        input=True,
-        frames_per_buffer=blocksize,
-        input_device_index=device["index"],
-    )
-    return pa, stream, channels
+    try:
+        device = (
+            pa.get_device_info_by_index(device_index)
+            if device_index is not None
+            else pa.get_default_input_device_info()
+        )
+        channels = max(int(device.get("maxInputChannels", 1)), 1)
+        stream = pa.open(
+            format=pyaudio.paFloat32,
+            channels=channels,
+            rate=samplerate,
+            input=True,
+            frames_per_buffer=blocksize,
+            input_device_index=device["index"],
+        )
+        return pa, stream, channels
+    except OSError as exc:
+        pa.terminate()
+        raise RuntimeError("No input device available") from exc
 
 
 def compute_fft_bars(samples: np.ndarray, num_bars: int) -> np.ndarray:
@@ -136,11 +140,15 @@ def compute_fft_bars(samples: np.ndarray, num_bars: int) -> np.ndarray:
 def run_visualizer(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: int = 60) -> None:
     """Run the visualization until the window is closed."""
     device_index = choose_output_device()
-    pa, stream, channels = open_output_stream(
-        samplerate=samplerate,
-        blocksize=blocksize,
-        device_index=device_index,
-    )
+    try:
+        pa, stream, channels = open_output_stream(
+            samplerate=samplerate,
+            blocksize=blocksize,
+            device_index=device_index,
+        )
+    except RuntimeError as exc:
+        print(f"Error: {exc}")
+        return
 
     pygame.init()
     width, height = 800, 400
