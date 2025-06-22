@@ -15,7 +15,9 @@ import sys
 
 
 
-def open_output_stream(*, samplerate: int, blocksize: int) -> tuple[pyaudio.PyAudio, pyaudio.Stream]:
+def open_output_stream(
+    *, samplerate: int, blocksize: int
+) -> tuple[pyaudio.PyAudio, pyaudio.Stream, int]:
     """Return a PyAudio stream capturing the default output device.
 
     On Windows this uses WASAPI loopback so whatever is playing through the
@@ -45,25 +47,28 @@ def open_output_stream(*, samplerate: int, blocksize: int) -> tuple[pyaudio.PyAu
                     ):
                         device = dev
                         break
+            channels = max(int(device.get("maxInputChannels", 1)), 1)
             stream = pa.open(
                 format=pyaudio.paFloat32,
-                channels=1,
+                channels=channels,
                 rate=samplerate,
                 frames_per_buffer=blocksize,
                 input=True,
                 input_device_index=device["index"],
             )
-            return pa, stream
+            return pa, stream, channels
 
     # Fallback: capture from the default input device
+    device = pa.get_default_input_device_info()
+    channels = max(int(device.get("maxInputChannels", 1)), 1)
     stream = pa.open(
         format=pyaudio.paFloat32,
-        channels=1,
+        channels=channels,
         rate=samplerate,
         input=True,
         frames_per_buffer=blocksize,
     )
-    return pa, stream
+    return pa, stream, channels
 
 
 def compute_fft_bars(samples: np.ndarray, num_bars: int) -> np.ndarray:
@@ -83,7 +88,7 @@ def compute_fft_bars(samples: np.ndarray, num_bars: int) -> np.ndarray:
 
 def run_visualizer(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: int = 60) -> None:
     """Run the visualization until the window is closed."""
-    pa, stream = open_output_stream(samplerate=samplerate, blocksize=blocksize)
+    pa, stream, channels = open_output_stream(samplerate=samplerate, blocksize=blocksize)
 
     pygame.init()
     width, height = 800, 400
@@ -100,6 +105,8 @@ def run_visualizer(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: 
 
             data = stream.read(blocksize, exception_on_overflow=False)
             samples = np.frombuffer(data, dtype=np.float32)
+            if channels > 1:
+                samples = samples.reshape(-1, channels).mean(axis=1)
             bars = compute_fft_bars(samples, num_bars)
             max_val = np.max(bars) if np.max(bars) > 0 else 1e-6
 
