@@ -1,22 +1,69 @@
 """Simple real-time audio spectrum visualizer.
 
-This script captures audio from the system's default output device using the
-``soundcard`` library and displays the frequency spectrum in a Pygame window.
-It serves as a lightweight proof-of-concept for real-time audio visualization.
+This script captures audio from the system's default **output** device using
+``pyaudio`` on Windows and displays the frequency spectrum in a Pygame window.
+It serves as a lightweight proof of concept for real-time audio visualization.
+On other platforms, the default input device is used instead.
 """
 
 from __future__ import annotations
 
 import numpy as np
 import pygame
-import soundcard as sc
+import pyaudio
+import sys
 
 
-def open_output_recorder(samplerate: int) -> sc.Recorder:
-    """Return a recorder capturing the default speaker output."""
-    speaker = sc.default_speaker()
-    mic = sc.get_microphone(str(speaker.name), include_loopback=True)
-    return mic.recorder(samplerate=samplerate)
+
+def open_output_stream(*, samplerate: int, blocksize: int) -> tuple[pyaudio.PyAudio, pyaudio.Stream]:
+    """Return a PyAudio stream capturing the default output device.
+
+    On Windows this uses WASAPI loopback so whatever is playing through the
+    speakers will be captured. On other platforms the default input device is
+    used as a fallback.
+    """
+    pa = pyaudio.PyAudio()
+
+    if sys.platform == "win32":
+        # Attempt to locate the default speaker's loopback device.
+        wasapi_info = None
+        for i in range(pa.get_host_api_count()):
+            info = pa.get_host_api_info_by_index(i)
+            if info.get("type") == pyaudio.paWASAPI:
+                wasapi_info = info
+                break
+
+        if wasapi_info is not None:
+            device = pa.get_device_info_by_index(wasapi_info["defaultOutputDevice"])
+            if not device.get("isLoopbackDevice", False):
+                for i in range(pa.get_device_count()):
+                    dev = pa.get_device_info_by_index(i)
+                    if (
+                        dev.get("hostApi") == wasapi_info["index"]
+                        and dev.get("isLoopbackDevice")
+                        and dev.get("name") == device.get("name")
+                    ):
+                        device = dev
+                        break
+            stream = pa.open(
+                format=pyaudio.paFloat32,
+                channels=1,
+                rate=samplerate,
+                frames_per_buffer=blocksize,
+                input=True,
+                input_device_index=device["index"],
+            )
+            return pa, stream
+
+    # Fallback: capture from the default input device
+    stream = pa.open(
+        format=pyaudio.paFloat32,
+        channels=1,
+        rate=samplerate,
+        input=True,
+        frames_per_buffer=blocksize,
+    )
+    return pa, stream
 
 
 def compute_fft_bars(samples: np.ndarray, num_bars: int) -> np.ndarray:
@@ -36,7 +83,7 @@ def compute_fft_bars(samples: np.ndarray, num_bars: int) -> np.ndarray:
 
 def run_visualizer(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: int = 60) -> None:
     """Run the visualization until the window is closed."""
-    recorder_cm = open_output_recorder(samplerate)
+    pa, stream = open_output_stream(samplerate=samplerate, blocksize=blocksize)
 
     pygame.init()
     width, height = 800, 400
@@ -44,16 +91,16 @@ def run_visualizer(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: 
     pygame.display.set_caption("Audio Visualizer")
     clock = pygame.time.Clock()
 
-    with recorder_cm as recorder:
-        running = True
+    running = True
+    try:
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
-            data = recorder.record(numframes=blocksize)
-            mono = data.mean(axis=1)
-            bars = compute_fft_bars(mono, num_bars)
+            data = stream.read(blocksize, exception_on_overflow=False)
+            samples = np.frombuffer(data, dtype=np.float32)
+            bars = compute_fft_bars(samples, num_bars)
             max_val = np.max(bars) if np.max(bars) > 0 else 1e-6
 
             screen.fill((0, 0, 0))
@@ -70,6 +117,10 @@ def run_visualizer(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: 
 
             pygame.display.flip()
             clock.tick(60)
+    finally:
+        stream.stop_stream()
+        stream.close()
+        pa.terminate()
 
     pygame.quit()
 
