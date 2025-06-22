@@ -1,6 +1,6 @@
 # Dust Audio Visualizer
 
-This repository contains a small real-time audio visualizer written in Python. It captures audio directly from the system's default **speaker output** (loopback) using the `soundcard` library and displays the frequency spectrum in a Pygame window. No physical microphone is required.
+This repository contains a small real-time audio visualizer written in Python. It captures audio using the `pyaudio` library and displays the frequency spectrum in a Pygame window. On Windows it records from the default speaker output using WASAPI loopback so you can visualize music or other playback. On other platforms the default input device is used.
 
 ## Setup (Windows)
 
