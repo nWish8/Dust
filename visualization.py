@@ -6,7 +6,7 @@ import numpy as np
 import pygame
 
 from audio_processing import (
-    choose_output_device,
+    choose_capture_device,
     open_output_stream,
     compute_fft_bars,
 )
@@ -14,7 +14,7 @@ from audio_processing import (
 
 def run_visualization(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: int = 60) -> None:
     """Run the visualization until the window is closed."""
-    device_index = choose_output_device()
+    device_index = choose_capture_device()
     try:
         pa, stream, channels = open_output_stream(
             samplerate=samplerate,
