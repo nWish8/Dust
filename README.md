@@ -20,7 +20,7 @@ This repository contains a small real-time audio visualizer written in Python. I
 Run the visualizer with:
 
 ```bash
-python visualizer.py
+python main.py
 ```
 
 Close the window or press `Ctrl+C` to exit.
