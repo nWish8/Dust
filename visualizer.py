@@ -14,25 +14,23 @@ import pyaudio
 import sys
 
 
-def choose_output_device() -> int | None:
-    """Prompt the user to select an output device.
+def choose_capture_device() -> int | None:
+    """Prompt the user to select an input or loopback device.
 
     Returns the PyAudio device index or ``None`` for the default device.
     """
     pa = pyaudio.PyAudio()
     try:
         devices: list[int] = []
-        print("Available output devices:")
+        print("Available capture devices:")
         for idx in range(pa.get_device_count()):
             info = pa.get_device_info_by_index(idx)
-            if sys.platform == "win32":
-                if info.get("maxOutputChannels", 0) > 0 and not info.get("isLoopbackDevice", False):
-                    devices.append(idx)
-                    print(f"{len(devices) - 1}: {info.get('name')}")
-            else:
-                if info.get("maxInputChannels", 0) > 0:
-                    devices.append(idx)
-                    print(f"{len(devices) - 1}: {info.get('name')}")
+            if info.get("maxInputChannels", 0) > 0 or info.get("isLoopbackDevice", False):
+                devices.append(idx)
+                label = info.get("name")
+                if info.get("isLoopbackDevice", False):
+                    label += " (loopback)"
+                print(f"{len(devices) - 1}: {label}")
 
         if not devices:
             return None
@@ -148,7 +146,7 @@ def compute_fft_bars(samples: np.ndarray, num_bars: int) -> np.ndarray:
 
 def run_visualizer(*, samplerate: int = 44100, blocksize: int = 1024, num_bars: int = 60) -> None:
     """Run the visualization until the window is closed."""
-    device_index = choose_output_device()
+    device_index = choose_capture_device()
     try:
         pa, stream, channels = open_output_stream(
             samplerate=samplerate,
