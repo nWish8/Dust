@@ -2,3 +2,6 @@ numpy
 pygame
 pyaudio
 soundcard
+moderngl
+scipy
+pyrr
