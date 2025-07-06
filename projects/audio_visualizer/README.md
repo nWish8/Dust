@@ -14,7 +14,7 @@ This project contains multiple audio visualizers:
    python main.py
    ```
 3. Select the visualizer you want to run from the menu.
-4. Select your audio input device when prompted.
+4. Select your audio input device when prompted. *note only mic seems to work atm
 
 ## Adding New Visualizers
 - Add a new Python file in this folder and update `main.py` to include it in the menu.
