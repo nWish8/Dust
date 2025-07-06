@@ -1,5 +1,5 @@
 """
-visualization_2.py - Audio visualizer inspired by the original audiofabric repo
+mesh_wave.py - Audio visualizer inspired by the original audiofabric repo
 - Mesh grid with Delaunay triangulation
 - Spring/neighbor mesh update logic
 - FFT bin mapping and color logic closely emulating audiofabric
@@ -20,39 +20,8 @@ WIN_SIZE = (1000, 700)
 GRID_N = 32
 BAR_SCALE = 1.2
 
-def select_device_terminal():
-    pa = pyaudio.PyAudio()
-    device_list = []
-    allowed_apis = {"MME", "WASAPI"}
-    for idx in range(pa.get_device_count()):
-        info = pa.get_device_info_by_index(idx)
-        label = info.get("name", "")
-        if "hands-free" in label.lower():
-            continue
-        host_api_index = info.get("hostApi")
-        host_api_name = pa.get_host_api_info_by_index(host_api_index).get("name", "?")
-        if host_api_name.startswith("Windows "):
-            host_api_name = host_api_name.replace("Windows ", "")
-        if host_api_name not in allowed_apis:
-            continue
-        if info.get("maxInputChannels", 0) > 0 or info.get("isLoopbackDevice", False):
-            device_list.append((idx, label, host_api_name))
-    pa.terminate()
-    if not device_list:
-        raise RuntimeError("No available capture devices.")
-    print("Available devices:")
-    for i, (idx, label, api) in enumerate(device_list):
-        print(f"{i+1}. {label} [{api}]")
-    sel = input(f"Select device [1-{len(device_list)}] (default 1): ").strip()
-    try:
-        sel = int(sel) - 1 if sel else 0
-    except Exception:
-        sel = 0
-    sel = max(0, min(sel, len(device_list)-1))
-    return device_list[sel][0]
-
-def run_visualization_2():
-    device_index = select_device_terminal()
+def run_mesh_wave(*, samplerate: int = 44100, blocksize: int = 2048, num_bars: int = 60, interp: float = 0.5) -> None:
+    device_index = choose_capture_device()
     pygame.init()
     screen = pygame.display.set_mode(WIN_SIZE, DOUBLEBUF | OPENGL)
     ctx = moderngl.create_context()
@@ -113,8 +82,8 @@ def run_visualization_2():
     )
     vao = ctx.vertex_array(prog, [(vbo, '3f', 'in_pos')], ibo)
     pa, stream, channels, sample_format = open_output_stream(
-        samplerate=44100,
-        blocksize=2048,
+        samplerate=samplerate,
+        blocksize=blocksize,
         device_index=device_index,
     )
     blocksize = 2048
@@ -145,7 +114,7 @@ def run_visualization_2():
                 camera_elev = np.clip(camera_elev - dy * 0.01, 0.2, 3.0)
                 last_mouse = e.pos
         data = stream.read(blocksize, exception_on_overflow=False)
-        if sample_format == pyaudio.paInt16:
+        if sample_format == 8:  # pyaudio.paInt16
             samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
         else:
             samples = np.frombuffer(data, dtype=np.float32)
@@ -174,4 +143,4 @@ def run_visualization_2():
     pygame.quit()
 
 if __name__ == "__main__":
-    run_visualization_2()
+    run_mesh_wave()

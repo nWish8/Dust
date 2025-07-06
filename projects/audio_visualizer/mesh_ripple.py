@@ -22,7 +22,7 @@ GRID_N = 32
 BAR_SCALE = 1.8
 
 
-def run_visualization(
+def run_mesh_ripple(
     *, samplerate: int = 44100, blocksize: int = 2048, num_bars: int = 60, interp: float = 0.5
 ) -> None:
     """Run the visualization until the window is closed. Uses buffered FFT and optional interpolation."""
