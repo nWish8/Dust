@@ -19,7 +19,7 @@ from audio_processing import (
 
 WIN_SIZE = (1000, 700)
 GRID_N = 32
-BAR_SCALE = 1.2
+BAR_SCALE = 1.8
 
 
 def run_visualization(
@@ -129,7 +129,7 @@ def run_visualization(
                 self.dy *= -1
 
     hotspots = []
-    max_hotspots = 8  # increased from 8 to 20 for more simultaneous hotspots
+    max_hotspots = 8
 
     bars = np.zeros(GRID_N * GRID_N, dtype="f4")
     heights = np.zeros(GRID_N * GRID_N, dtype="f4")  # persistent mesh heights
