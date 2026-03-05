@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Sand — sorting algorithm visualizer. Watch bubble, insertion, selection, merge, quick, and heap sort on 200 elements simultaneously.">
+  <meta property="og:title" content="Sand — Sorting Visualizer">
+  <meta property="og:description" content="Sorting algorithm visualizer: 6 algorithms running side-by-side on a canvas, with live comparison counters.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='10' fill='%2388c4f7' opacity='0.85'/></svg>">
+  <title>Sand</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #010008;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+      color: #88c4f7;
+    }
+
+    /* ── Back link ── */
+    .back-link {
+      position: fixed;
+      top: 22px;
+      left: 24px;
+      font-size: 0.62rem;
+      letter-spacing: 0.22em;
+      color: rgba(136, 196, 247, 0.35);
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color 0.2s;
+      z-index: 10;
+    }
+    .back-link:hover { color: rgba(136, 196, 247, 0.75); }
+
+    /* ── Canvas centred ── */
+    #canvas-wrap {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #c {
+      display: block;
+      /* scale canvas to fit viewport while preserving aspect ratio */
+      max-width: 100vw;
+      max-height: 100vh;
+      width: auto;
+      height: auto;
+      image-rendering: pixelated;
+    }
+
+    /* ── Overlay ── */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      background: rgba(1, 0, 8, 0.92);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      transition: opacity 0.8s ease;
+      z-index: 20;
+    }
+
+    #overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 100% center; }
+      100% { background-position: -100% center; }
+    }
+
+    h1 {
+      font-size: clamp(3rem, 11vw, 6rem);
+      font-weight: 100;
+      letter-spacing: 0.7em;
+      padding-right: 0.7em;
+      background: linear-gradient(105deg, #4a8ec2 0%, #7ab8e8 30%, #c2e0ff 50%, #7ab8e8 70%, #4a8ec2 100%);
+      background-size: 250% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 9s linear infinite;
+      filter: drop-shadow(0 0 28px rgba(100, 180, 255, 0.30));
+      margin-bottom: 18px;
+      user-select: none;
+    }
+
+    .title-rule {
+      width: 48px;
+      height: 1px;
+      margin: 0 auto 18px;
+      background: linear-gradient(to right, transparent, rgba(138, 200, 248, 0.35), transparent);
+    }
+
+    .sub {
+      font-size: 0.68rem;
+      letter-spacing: 0.38em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.24);
+      margin-bottom: 52px;
+    }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    button {
+      background: transparent;
+      border: 1px solid rgba(120, 185, 255, 0.35);
+      color: #88c4f7;
+      padding: 11px 32px;
+      font-size: 0.72rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
+      font-family: inherit;
+    }
+
+    button:hover:not(:disabled) {
+      background: rgba(100, 180, 255, 0.06);
+      border-color: rgba(140, 210, 255, 0.65);
+      color: #b8dcff;
+      box-shadow: 0 0 22px rgba(80, 160, 255, 0.18);
+    }
+
+    button:disabled {
+      opacity: 0.28;
+      cursor: not-allowed;
+    }
+
+    /* ── Controls bar (visible while running) ── */
+    #controls {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    #controls.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #controls button {
+      padding: 8px 22px;
+      font-size: 0.62rem;
+      border-color: rgba(120, 185, 255, 0.22);
+      color: rgba(136, 196, 247, 0.55);
+    }
+
+    #controls button:hover:not(:disabled) {
+      border-color: rgba(140, 210, 255, 0.55);
+      color: #88c4f7;
+      box-shadow: 0 0 16px rgba(80, 160, 255, 0.14);
+    }
+  </style>
+</head>
+<body>
+  <a class="back-link" href="../index.html">← DUST</a>
+
+  <div id="canvas-wrap">
+    <canvas id="c"></canvas>
+  </div>
+
+  <!-- ── Start overlay ── -->
+  <div id="overlay">
+    <h1>SAND</h1>
+    <div class="title-rule"></div>
+    <p class="sub">sorting algorithm visualizer</p>
+    <div class="btn-row">
+      <button id="startBtn">START</button>
+    </div>
+  </div>
+
+  <!-- ── Running controls ── -->
+  <div id="controls">
+    <button id="startBtn2">RESTART</button>
+    <button id="resetBtn">RESET</button>
+  </div>
+
+  <script type="module">
+    import { start, reset } from './sort.js';
+
+    const overlay  = document.getElementById('overlay');
+    const controls = document.getElementById('controls');
+    const startBtn  = document.getElementById('startBtn');
+    const startBtn2 = document.getElementById('startBtn2');
+    const resetBtn  = document.getElementById('resetBtn');
+
+    function beginSort() {
+      overlay.classList.add('hidden');
+      controls.classList.add('visible');
+      start();
+    }
+
+    function doReset() {
+      reset();
+      // Brief delay so canvas redraws before overlay reappears
+      setTimeout(() => {
+        overlay.style.display = 'flex';
+        requestAnimationFrame(() => overlay.classList.remove('hidden'));
+        controls.classList.remove('visible');
+      }, 80);
+    }
+
+    startBtn.addEventListener('click', beginSort);
+    startBtn2.addEventListener('click', () => { reset(); start(); });
+    resetBtn.addEventListener('click', doReset);
+  </script>
+</body>
+</html>

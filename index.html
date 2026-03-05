@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Dust — creative web experiments. Audio visualizer, sorting algorithms, routing visualizer.">
+  <meta property="og:title" content="Dust">
+  <meta property="og:description" content="Creative web experiments: Fabric audio visualizer, Sand sorting visualizer, Sprint routing visualizer.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='10' fill='%2388c4f7' opacity='0.85'/></svg>">
+  <title>Dust</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ── Layout ── */
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 48px 24px 64px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 72px;
+    }
+
+    h1 {
+      font-size: clamp(3.5rem, 13vw, 7.5rem);
+      font-weight: 100;
+      letter-spacing: 0.75em;
+      padding-right: 0.75em; /* compensate letter-spacing */
+      background: linear-gradient(
+        105deg,
+        #4a8ec2 0%,
+        #7ab8e8 30%,
+        #c2e0ff 50%,
+        #7ab8e8 70%,
+        #4a8ec2 100%
+      );
+      background-size: 250% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: shimmer 9s linear infinite;
+      filter: drop-shadow(0 0 32px rgba(100, 180, 255, 0.28));
+      user-select: none;
+      margin-bottom: 20px;
+    }
+
+    .title-rule {
+      width: 48px;
+      height: 1px;
+      margin: 0 auto 20px;
+      background: linear-gradient(to right, transparent, rgba(138, 200, 248, 0.35), transparent);
+    }
+
+    .tagline {
+      font-size: 0.62rem;
+      letter-spacing: 0.42em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* ── Cards ── */
+    .cards {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 860px;
+    }
+
+    .card {
+      position: relative;
+      flex: 1 1 220px;
+      max-width: 260px;
+      border: 1px solid rgba(120, 185, 255, 0.14);
+      padding: 32px 28px 28px;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+      background: rgba(1, 0, 8, 0.60);
+    }
+
+    .card:hover {
+      border-color: rgba(136, 196, 247, 0.45);
+      box-shadow: 0 0 36px rgba(80, 160, 255, 0.12), inset 0 0 24px rgba(80, 160, 255, 0.04);
+      background: rgba(4, 2, 18, 0.80);
+    }
+
+    .card.disabled {
+      pointer-events: none;
+      opacity: 0.38;
+    }
+
+    .card-name {
+      font-size: 1.15rem;
+      font-weight: 100;
+      letter-spacing: 0.52em;
+      padding-right: 0.52em;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+
+    .card-rule {
+      width: 28px;
+      height: 1px;
+      background: linear-gradient(to right, rgba(138, 200, 248, 0.30), transparent);
+      margin-bottom: 14px;
+    }
+
+    .card-desc {
+      font-size: 0.60rem;
+      letter-spacing: 0.20em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      line-height: 1.7;
+    }
+
+    .card-arrow {
+      position: absolute;
+      bottom: 22px;
+      right: 22px;
+      font-size: 0.58rem;
+      letter-spacing: 0.14em;
+      color: rgba(136, 196, 247, 0.22);
+      transition: color 0.2s, transform 0.2s;
+    }
+
+    .card:hover .card-arrow {
+      color: rgba(136, 196, 247, 0.65);
+      transform: translateX(3px);
+    }
+
+    /* Coming soon badge */
+    .badge {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: 0.52rem;
+      letter-spacing: 0.30em;
+      text-transform: uppercase;
+      color: rgba(136, 196, 247, 0.30);
+      border: 1px solid rgba(136, 196, 247, 0.12);
+      padding: 4px 10px;
+    }
+
+    /* ── Star-field background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(circle, rgba(136, 196, 247, 0.55) 1px, transparent 1px),
+        radial-gradient(circle, rgba(136, 196, 247, 0.35) 1px, transparent 1px),
+        radial-gradient(circle, rgba(136, 196, 247, 0.20) 1px, transparent 1px),
+        radial-gradient(circle, rgba(136, 196, 247, 0.15) 1px, transparent 1px);
+      background-size: 160px 160px, 260px 260px, 100px 100px, 200px 200px;
+      background-position: 14px 22px, 80px 50px, 40px 70px, 130px 10px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Ensure card grid renders above star-field */
+    header, .cards, footer { position: relative; z-index: 1; }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 80px;
+      font-size: 0.55rem;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.10);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>DUST</h1>
+    <div class="title-rule"></div>
+    <p class="tagline">creative experiments</p>
+  </header>
+
+  <div class="cards">
+
+    <a class="card" href="fabric/index.html">
+      <div class="card-name">FABRIC</div>
+      <div class="card-rule"></div>
+      <p class="card-desc">real-time audio visualizer</p>
+      <span class="card-arrow">→</span>
+    </a>
+
+    <a class="card" href="sand/index.html">
+      <div class="card-name">SAND</div>
+      <div class="card-rule"></div>
+      <p class="card-desc">sorting algorithm visualizer</p>
+      <span class="card-arrow">→</span>
+    </a>
+
+    <a class="card" href="sprint/index.html">
+      <div class="card-name">SPRINT</div>
+      <div class="card-rule"></div>
+      <p class="card-desc">routing algorithm visualizer</p>
+      <span class="card-arrow">→</span>
+    </a>
+
+  </div>
+
+  <footer>DUST &nbsp;&middot;&nbsp; 2026</footer>
+
+</body>
+</html>

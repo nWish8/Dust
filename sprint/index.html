@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Sprint — routing algorithm visualizer on real city street networks.">
+  <meta property="og:title" content="Sprint — Routing Visualizer">
+  <meta property="og:description" content="Watch Dijkstra, A*, BFS and DFS find paths through real city street networks.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='10' fill='%2388c4f7' opacity='0.85'/></svg>">
+  <title>Sprint</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: #010008;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+      color: #88c4f7;
+    }
+
+    .back-link {
+      position: fixed; top: 22px; left: 24px;
+      font-size: 0.62rem; letter-spacing: 0.22em;
+      color: rgba(136,196,247,0.35); text-decoration: none;
+      text-transform: uppercase; transition: color 0.2s; z-index: 30;
+    }
+    .back-link:hover { color: rgba(136,196,247,0.75); }
+
+    #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+    /* ── Overlay ── */
+    #overlay {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(1,0,8,0.90);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+      transition: opacity 0.7s ease; z-index: 20;
+    }
+    #overlay.hidden { opacity: 0; pointer-events: none; }
+
+    @keyframes shimmer {
+      0%   { background-position: 100% center; }
+      100% { background-position: -100% center; }
+    }
+    h1 {
+      font-size: clamp(3rem,11vw,6rem); font-weight: 100;
+      letter-spacing: 0.7em; padding-right: 0.7em;
+      background: linear-gradient(105deg,#4a8ec2 0%,#7ab8e8 30%,#c2e0ff 50%,#7ab8e8 70%,#4a8ec2 100%);
+      background-size: 250% 100%;
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      animation: shimmer 9s linear infinite;
+      filter: drop-shadow(0 0 28px rgba(100,180,255,0.30));
+      margin-bottom: 18px; user-select: none;
+    }
+    .title-rule {
+      width: 48px; height: 1px; margin: 0 auto 18px;
+      background: linear-gradient(to right,transparent,rgba(138,200,248,0.35),transparent);
+    }
+    .sub {
+      font-size: 0.68rem; letter-spacing: 0.38em;
+      text-transform: uppercase; color: rgba(255,255,255,0.24); margin-bottom: 40px;
+    }
+
+    /* ── Buttons (shared) ── */
+    button {
+      background: transparent; border: 1px solid rgba(120,185,255,0.35);
+      color: #88c4f7; padding: 11px 28px;
+      font-size: 0.70rem; letter-spacing: 0.22em; text-transform: uppercase;
+      cursor: pointer; font-family: inherit;
+      transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, color 0.2s;
+    }
+    button:hover:not(:disabled) {
+      background: rgba(100,180,255,0.06);
+      border-color: rgba(140,210,255,0.65); color: #b8dcff;
+      box-shadow: 0 0 22px rgba(80,160,255,0.18);
+    }
+    button:disabled { opacity: 0.28; cursor: not-allowed; }
+    button.active {
+      border-color: rgba(136,196,247,0.70); color: #b8dcff;
+      box-shadow: 0 0 18px rgba(80,160,255,0.22);
+    }
+
+    .algo-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 28px; }
+    .algo-row button { padding: 8px 18px; font-size: 0.62rem; }
+    .btn-row { display: flex; gap: 10px; }
+
+    /* ── Controls (bottom bar) ── */
+    #controls {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 8px; z-index: 10;
+      opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
+    }
+    #controls.visible { opacity: 1; pointer-events: auto; }
+    #controls button {
+      padding: 7px 18px; font-size: 0.60rem;
+      border-color: rgba(120,185,255,0.22); color: rgba(136,196,247,0.55);
+    }
+    #controls button:hover:not(:disabled) { border-color: rgba(140,210,255,0.55); color: #88c4f7; }
+    #controls button.active { border-color: rgba(136,196,247,0.60); color: #88c4f7; }
+    #controls .sep { width: 1px; height: 22px; background: rgba(136,196,247,0.14); margin: 0 4px; }
+    #controls #runBtn, #controls #clearBtn {
+      color: #88c4f7; border-color: rgba(120,185,255,0.40);
+    }
+
+    /* ── City selector (top-right) ── */
+    #city-selector {
+      position: fixed; top: 16px; right: 16px; z-index: 25;
+      opacity: 0; pointer-events: none; transition: opacity 0.5s;
+    }
+    #city-selector.visible { opacity: 1; pointer-events: auto; }
+
+    #city-toggle {
+      padding: 6px 14px; font-size: 0.58rem; letter-spacing: 0.22em;
+      border-color: rgba(120,185,255,0.22); color: rgba(136,196,247,0.50);
+      background: rgba(1,0,8,0.80); display: flex; align-items: center; gap: 6px;
+    }
+    #city-toggle:hover { color: #88c4f7; border-color: rgba(136,196,247,0.55); }
+    #city-toggle .arrow { font-size: 0.50rem; transition: transform 0.2s; display: inline-block; }
+    #city-toggle.open .arrow { transform: rotate(180deg); }
+
+    #city-panel {
+      margin-top: 4px;
+      background: rgba(1,0,8,0.92);
+      border: 1px solid rgba(120,185,255,0.18);
+      display: none;
+      flex-direction: column;
+      min-width: 160px;
+      overflow: hidden;
+    }
+    #city-panel.open { display: flex; }
+
+    .city-btn {
+      padding: 8px 14px; font-size: 0.58rem; letter-spacing: 0.18em;
+      border: none; border-bottom: 1px solid rgba(120,185,255,0.08);
+      color: rgba(136,196,247,0.45); text-align: left; cursor: pointer;
+      background: transparent; transition: background 0.15s, color 0.15s;
+    }
+    .city-btn:last-child { border-bottom: none; }
+    .city-btn:hover { background: rgba(100,180,255,0.06); color: #88c4f7; }
+    .city-btn.active { color: #b8dcff; background: rgba(100,180,255,0.08); }
+    .city-btn.loading { opacity: 0.45; cursor: wait; }
+
+    /* ── Stats (top-left, below back link) ── */
+    #stats {
+      position: fixed; top: 45px; left: 24px;
+      display: none; flex-direction: column; gap: 3px;
+      font-size: 0.58rem; letter-spacing: 0.16em; text-transform: uppercase; z-index: 10;
+    }
+    #stats span { color: rgba(136,196,247,0.45); display: block; }
+
+    /* ── Hint ── */
+    #hint {
+      position: fixed; bottom: 68px; left: 50%; transform: translateX(-50%);
+      font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase;
+      color: rgba(136,196,247,0.22); pointer-events: none; z-index: 10;
+      white-space: nowrap; opacity: 0; transition: opacity 0.4s;
+    }
+    #hint.visible { opacity: 1; }
+
+    /* ── Loading ── */
+    #loading {
+      position: fixed; inset: 0; display: flex;
+      align-items: center; justify-content: center;
+      font-size: 0.62rem; letter-spacing: 0.30em; text-transform: uppercase;
+      color: rgba(136,196,247,0.35); z-index: 25; pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <a class="back-link" href="../index.html">← DUST</a>
+
+  <canvas id="c"></canvas>
+  <div id="loading">loading map data&hellip;</div>
+
+  <!-- ── Start overlay ── -->
+  <div id="overlay" style="display:none">
+    <h1>SPRINT</h1>
+    <div class="title-rule"></div>
+    <p class="sub">routing algorithm visualizer</p>
+    <div class="algo-row">
+      <button class="algo-btn active" data-algo="bfs">BFS</button>
+      <button class="algo-btn" data-algo="dfs">DFS</button>
+      <button class="algo-btn" data-algo="dijkstra">DIJKSTRA</button>
+      <button class="algo-btn" data-algo="astar">A-STAR</button>
+    </div>
+    <div class="btn-row">
+      <button id="startBtn">START</button>
+    </div>
+  </div>
+
+  <!-- ── Bottom controls ── -->
+  <div id="controls">
+    <button class="algo-btn active" data-algo="bfs">BFS</button>
+    <button class="algo-btn" data-algo="dfs">DFS</button>
+    <button class="algo-btn" data-algo="dijkstra">DIJKSTRA</button>
+    <button class="algo-btn" data-algo="astar">A-STAR</button>
+    <div class="sep"></div>
+    <button id="runBtn" disabled>RUN</button>
+    <button id="clearBtn">CLEAR</button>
+  </div>
+
+  <!-- ── City selector (top-right) ── -->
+  <div id="city-selector">
+    <button id="city-toggle">
+      <span id="city-toggle-label">Manhattan</span>
+      <span class="arrow">&#9660;</span>
+    </button>
+    <div id="city-panel">
+      <button class="city-btn active" data-slug="manhattan">Manhattan</button>
+      <button class="city-btn" data-slug="san-francisco">San Francisco</button>
+      <button class="city-btn" data-slug="barcelona">Barcelona</button>
+      <button class="city-btn" data-slug="venice">Venice</button>
+      <button class="city-btn" data-slug="tokyo">Tokyo</button>
+      <button class="city-btn" data-slug="mumbai">Mumbai</button>
+      <button class="city-btn" data-slug="marrakech">Marrakech</button>
+      <button class="city-btn" data-slug="singapore">Singapore</button>
+      <button class="city-btn" data-slug="melbourne">Melbourne</button>
+      <button class="city-btn" data-slug="dubai">Dubai</button>
+      <button class="city-btn" data-slug="seattle">Seattle</button>
+    </div>
+  </div>
+
+  <div id="stats"></div>
+  <div id="hint">click a node to set source</div>
+
+  <script type="module">
+    import {
+      loadCity, init, setAlgo, run, handleClick, onResize, getCityLabel,
+      bfsAlgo, dfsAlgo, dijkstraAlgo, astarAlgo,
+    } from './route.js';
+
+    const canvas        = document.getElementById('c');
+    const overlayEl     = document.getElementById('overlay');
+    const controlsEl    = document.getElementById('controls');
+    const loadingEl     = document.getElementById('loading');
+    const hintEl        = document.getElementById('hint');
+    const citySelector  = document.getElementById('city-selector');
+    const cityToggleBtn = document.getElementById('city-toggle');
+    const cityToggleLbl = document.getElementById('city-toggle-label');
+    const cityPanel     = document.getElementById('city-panel');
+
+    const algoMap = { bfs: bfsAlgo, dfs: dfsAlgo, dijkstra: dijkstraAlgo, astar: astarAlgo };
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', () => { resize(); onResize(); });
+
+    // ── Load city ──────────────────────────────────────────────────────────
+    async function switchCity(slug, label) {
+      // Mark loading
+      document.querySelectorAll('.city-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.slug === slug);
+        b.classList.toggle('loading', b.dataset.slug === slug);
+      });
+      cityToggleLbl.textContent = label;
+      cityPanel.classList.remove('open');
+      cityToggleBtn.classList.remove('open');
+
+      try {
+        await loadCity(slug);
+        init();
+        document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('loading'));
+        hintEl.textContent = 'click a node to set source';
+        hintEl.classList.add('visible');
+      } catch (e) {
+        cityToggleLbl.textContent = 'load failed';
+        document.querySelectorAll('.city-btn').forEach(b => b.classList.remove('loading'));
+      }
+    }
+
+    // Initial load
+    loadCity('manhattan').then(() => {
+      loadingEl.style.display = 'none';
+      init();
+      overlayEl.style.display = 'flex';
+    }).catch(err => {
+      loadingEl.textContent = 'failed to load map';
+    });
+
+    // ── City panel toggle ──────────────────────────────────────────────────
+    cityToggleBtn.addEventListener('click', () => {
+      const open = cityPanel.classList.toggle('open');
+      cityToggleBtn.classList.toggle('open', open);
+    });
+
+    // Close panel on outside click
+    document.addEventListener('click', e => {
+      if (!citySelector.contains(e.target)) {
+        cityPanel.classList.remove('open');
+        cityToggleBtn.classList.remove('open');
+      }
+    });
+
+    document.querySelectorAll('.city-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        switchCity(btn.dataset.slug, btn.textContent.trim());
+      });
+    });
+
+    // ── Algo buttons ──────────────────────────────────────────────────────
+    function selectAlgo(key) {
+      document.querySelectorAll('.algo-btn').forEach(b => b.classList.toggle('active', b.dataset.algo === key));
+      setAlgo(algoMap[key]);
+    }
+    document.querySelectorAll('.algo-btn').forEach(btn => {
+      btn.addEventListener('click', () => selectAlgo(btn.dataset.algo));
+    });
+
+    // ── Overlay start ─────────────────────────────────────────────────────
+    document.getElementById('startBtn').addEventListener('click', () => {
+      overlayEl.classList.add('hidden');
+      controlsEl.classList.add('visible');
+      citySelector.classList.add('visible');
+      hintEl.classList.add('visible');
+    });
+
+    // ── Run / Clear ───────────────────────────────────────────────────────
+    document.getElementById('runBtn').addEventListener('click', () => {
+      hintEl.classList.remove('visible'); run();
+    });
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      init();
+      hintEl.textContent = 'click a node to set source';
+      hintEl.classList.add('visible');
+    });
+
+    // ── Canvas click ──────────────────────────────────────────────────────
+    let clickCount = 0;
+    canvas.addEventListener('click', e => {
+      const rect = canvas.getBoundingClientRect();
+      handleClick(e.clientX - rect.left, e.clientY - rect.top);
+      clickCount++;
+      if      (clickCount % 3 === 1) hintEl.textContent = 'click a node to set destination';
+      else if (clickCount % 3 === 2) hintEl.textContent = 'click RUN to visualize';
+      else                           hintEl.textContent = 'click a node to set source';
+      hintEl.classList.add('visible');
+    });
+  </script>
+</body>
+</html>

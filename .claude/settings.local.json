@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(../.venv/Scripts/python.exe:*)",
+      "Bash(/c/Users/Nick/Documents/Projects/Dust/.venv/Scripts/python.exe:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(done)",
+      "Bash(wc:*)",
+      "Bash(python3:*)",
+      "Bash(grep:*)",
+      "Bash(python:*)",
+      "Bash(.venv/Scripts/python.exe:*)"
+    ]
+  }
+}

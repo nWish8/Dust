@@ -1,0 +1,28 @@
+/* ── Dust design tokens ── */
+:root {
+  --bg:         #010008;
+  --accent:     #88c4f7;
+  --accent-dim: rgba(120, 185, 255, 0.35);
+  --text-dim:   rgba(255, 255, 255, 0.24);
+}
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  background: var(--bg);
+  font-family: 'Courier New', Courier, monospace;
+  color: var(--accent);
+  overflow-x: hidden;
+}
+
+/* ── Shimmer keyframe (shared) ── */
+@keyframes shimmer {
+  0%   { background-position: 100% center; }
+  100% { background-position: -100% center; }
+}
